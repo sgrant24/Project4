@@ -1,0 +1,64 @@
+--- rm.c	2011-10-23 20:36:33.322475744 -0700
++++ rm.c.orig	2009-09-29 06:27:54.000000000 -0700
+@@ -28,6 +28,7 @@
+ #include "argmatch.h"
+ #include "error.h"
+ #include "quote.h"
++#include "quotearg.h"
+ #include "remove.h"
+ #include "root-dev-ino.h"
+ #include "yesno.h"
+@@ -97,6 +98,33 @@
+ };
+ ARGMATCH_VERIFY (interactive_args, interactive_types);
+ 
++/* Advise the user about invalid usages like "rm -foo" if the file
++   "-foo" exists, assuming ARGC and ARGV are as with `main'.  */
++
++static void
++diagnose_leading_hyphen (int argc, char **argv)
++{
++  /* OPTIND is unreliable, so iterate through the arguments looking
++     for a file name that looks like an option.  */
++  int i;
++
++  for (i = 1; i < argc; i++)
++    {
++      char const *arg = argv[i];
++      struct stat st;
++
++      if (arg[0] == '-' && arg[1] && lstat (arg, &st) == 0)
++        {
++          fprintf (stderr,
++                   _("Try `%s ./%s' to remove the file %s.\n"),
++                   argv[0],
++                   quotearg_n_style (1, shell_quoting_style, arg),
++                   quote (arg));
++          break;
++        }
++    }
++}
++
+ void
+ usage (int status)
+ {
+@@ -281,6 +309,7 @@
+         case_GETOPT_HELP_CHAR;
+         case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
+         default:
++          diagnose_leading_hyphen (argc, argv);
+           usage (EXIT_FAILURE);
+         }
+     }
+--- NEWS	2011-10-23 19:55:07.822586558 -0700
++++ NEWS.orig	2009-10-06 04:04:16.000000000 -0700
+@@ -1661,6 +1661,9 @@
+   If stdin is a terminal, nohup now redirects it from /dev/null to
+   prevent the command from tying up an OpenSSH session after you logout.
+ 
++  "rm -FOO" now suggests "rm ./-FOO" if the file "-FOO" exists and
++  "-FOO" is not a valid option.
++
+   stat -f -c %S outputs the fundamental block size (used for block counts).
+   stat -f's default output format has been changed to output this size as well.
+   stat -f recognizes file systems of type XFS and JFS
